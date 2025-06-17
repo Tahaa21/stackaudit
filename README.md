@@ -30,3 +30,40 @@ All results are exported to:
 
    ```bash
    aws configure --profile stackaudit-test
+Run the scanner:
+
+bash
+Copy
+Edit
+python3 scanner.py --profile stackaudit-test
+Get clean, downloadable reports for your records or audits.
+
+📦 Coming Soon
+Streamlit dashboard UI (SaaS version)
+
+Organization-wide IAM risk scoring
+
+GitHub Actions integration
+
+Automated AWS hardening suggestions
+
+💡 Who It's For
+Startups on AWS
+
+Freelance DevOps/SecOps engineers
+
+MSPs and vCISOs
+
+Anyone who wants fast AWS visibility without enterprise pricing
+
+🛠 Tech Stack
+Python + Boto3
+
+xlsxwriter for Excel output
+
+fpdf2 for PDF generation
+
+📬 Contact
+Built by @tahaaK21
+DM me on LinkedIn if you’d like to collaborate or request features.
+
