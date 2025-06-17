@@ -1,0 +1,6 @@
+boto3
+xlsxwriter
+fpdf2
+pandas
+openpyxl
+fpdf

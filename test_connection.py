@@ -1,14 +1,11 @@
-import boto3
+from scanner import check_public_s3_buckets
 
-# Connect using named profile
-session = boto3.Session(profile_name='stackaudit-test')
-s3 = session.client('s3')
+public_buckets = check_public_s3_buckets(profile_name='stackaudit-test')
 
-# List S3 buckets
-try:
-    buckets = s3.list_buckets()
-    print("✅ Connected! Found the following S3 buckets:")
-    for bucket in buckets['Buckets']:
-        print(f"  - {bucket['Name']}")
-except Exception as e:
-    print("❌ Error connecting to AWS:", e)
+print("\n--- Summary ---")
+if public_buckets:
+    print(f"{len(public_buckets)} public bucket(s) found:")
+    for b in public_buckets:
+        print(f" - {b}")
+else:
+    print("No public buckets found.")
