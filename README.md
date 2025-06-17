@@ -1,3 +1,8 @@
+<p align="right">
+  <img src="assets/logo.png" width="150" alt="StackAudit Logo">
+</p>
+
+
 # StackAudit
 
 **Audit your AWS misconfigurations in minutes.**  
