@@ -1,89 +1,139 @@
+import os
 import pandas as pd
+from fpdf import FPDF
 from datetime import datetime
 
-def generate_excel_report(scan_results, output_folder='reports'):
-    if not scan_results:
-        print("✅ No results to export — skipping report.")
-        return
+TOOL_NAME = "StackAudit"
+VERSION = "v1.0"
 
-    # Create reports folder if needed
-    import os
-    os.makedirs(output_folder, exist_ok=True)
+SEVERITY_COLORS = {
+    "Critical": (255, 0, 0),        # Red
+    "High":     (255, 102, 0),      # Orange
+    "Medium":   (218, 165, 32),     # Goldenrod
+    "Low":      (0, 128, 0),        # Green
+    "Info":     (30, 144, 255),     # Blue
+}
 
-    # Build DataFrame
-    df = pd.DataFrame(scan_results)
-    df = df[["Check", "Resource", "Issue", "Severity"]]  # Column order
-    df.sort_values(by="Severity", ascending=False, inplace=True)
+def summarize_findings(findings):
+    summary = {}
+    for f in findings:
+        sev = f.get("Severity", "Info")
+        summary[sev] = summary.get(sev, 0) + 1
+    return summary
 
-    # Timestamped filename
-    timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-    filename = f"{output_folder}/StackAudit_Report_{timestamp}.xlsx"
+def generate_excel_report(findings, output_dir="reports", timestamp=None):
+    if not timestamp:
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
 
-    # Export
-    df.to_excel(filename, index=False)
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, f"StackAudit_Report_{timestamp}.xlsx")
+
+    df = pd.DataFrame(findings)
+    if not df.empty:
+        df = df[["Check", "Resource", "Issue", "Severity"]]
+
+    summary = summarize_findings(findings)
+
+    with pd.ExcelWriter(filename, engine="xlsxwriter") as writer:
+        # Write findings
+        df.to_excel(writer, sheet_name="Findings", index=False)
+        workbook = writer.book
+        worksheet = writer.sheets["Findings"]
+
+        # Apply row color by severity
+        for row_num, severity in enumerate(df["Severity"], start=1):
+            color = {
+                "Critical": "#FF0000",
+                "High": "#FF6600",
+                "Medium": "#DAA520",
+                "Low": "#008000",
+                "Info": "#1E90FF"
+            }.get(severity, "#000000")
+
+            format = workbook.add_format({'bg_color': color, 'font_color': 'white'})
+            worksheet.set_row(row_num, cell_format=format)
+
+        # Add summary in new sheet
+        summary_df = pd.DataFrame(list(summary.items()), columns=["Severity", "Count"])
+        summary_df.to_excel(writer, sheet_name="Summary", index=False)
+
     print(f"📁 Excel report generated: {filename}")
 
-from fpdf import FPDF
 
-def generate_pdf_report(scan_results, output_folder='reports'):
-    if not scan_results:
-        print("✅ No results to export — skipping PDF report.")
-        return
-
+def generate_pdf_report(findings, output_dir="reports", timestamp=None):
+    from fpdf import FPDF
     import os
-    os.makedirs(output_folder, exist_ok=True)
 
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    filename = f"{output_folder}/StackAudit_Report_{timestamp.replace(':','-').replace(' ', '_')}.pdf"
+    def safe_text(s):
+        """Ensure string is latin-1 safe."""
+        return (
+            str(s)
+            .replace("–", "-")
+            .replace("—", "-")
+            .replace("“", '"')
+            .replace("”", '"')
+            .replace("‘", "'")
+            .replace("’", "'")
+            .replace("•", "-")
+            .encode("latin-1", "replace")
+            .decode("latin-1")
+        )
 
-    # Init PDF
+    if not timestamp:
+        from datetime import datetime
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+
+    os.makedirs(output_dir, exist_ok=True)
+    filename = os.path.join(output_dir, f"StackAudit_Report_{timestamp}.pdf")
+
     pdf = FPDF()
     pdf.add_page()
-    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.set_font("Arial", size=12)
 
-    # 🖼️ Add logo to top-right
+    # Add logo
     logo_path = "assets/logo.png"
     if os.path.exists(logo_path):
-        logo_width = 50  # adjust as needed
-        logo_x = 210 - logo_width - 10  # page_width - logo_width - right_margin
-        logo_y = 8
+        pdf.image(logo_path, x=150, y=10, w=40)
+        pdf.ln(30)
+    else:
+        pdf.ln(10)
 
-        pdf.image(logo_path, x=logo_x, y=logo_y, w=logo_width)
-        pdf.set_y(25)  # Adjust this if your title overlaps the logo
+    # Title + Version
+    pdf.set_text_color(0, 0, 0)
+    pdf.cell(200, 10, txt=safe_text("StackAudit - Scan Report"), ln=True)
+    pdf.set_font("Arial", size=10)
+    pdf.cell(200, 10, txt=safe_text("Version: v1.0"), ln=True)
+    pdf.ln(5)
 
-    # Title
-    pdf.set_font("Helvetica", 'B', 16)
-    pdf.cell(0, 10, "StackAudit Security Scan Report", ln=True)
-    pdf.set_font("Helvetica", '', 12)
-    pdf.cell(0, 10, f"Generated: {timestamp}", ln=True)
-    pdf.ln(10)
+    # Summary Section
+    summary = summarize_findings(findings)
+    if not findings:
+        pdf.set_text_color(0, 128, 0)
+        pdf.cell(200, 10, txt=safe_text("✅ No misconfigurations found."), ln=True)
+    else:
+        pdf.set_text_color(0, 0, 0)
+        summary_line = " | ".join([f"{v} {k}" for k, v in summary.items()])
+        pdf.cell(200, 10, txt=safe_text(f"Findings Summary: {summary_line}"), ln=True)
+        pdf.ln(4)
 
-    # Summary
-    severities = [r['Severity'] for r in scan_results]
-    total = len(severities)
-    high = severities.count("High")
-    medium = severities.count("Medium")
-    low = severities.count("Low")
+        for f in findings:
+            severity = f.get("Severity", "Info")
+            color = SEVERITY_COLORS.get(severity, (0, 0, 0))
+            pdf.set_text_color(*color)
 
-    pdf.set_font("Helvetica", 'B', 12)
-    pdf.cell(0, 10, f"Summary:", ln=True)
-    pdf.set_font("Helvetica", '', 12)
-    pdf.cell(0, 10, f"- Total Findings: {total}", ln=True)
-    pdf.cell(0, 10, f"- High: {high}   Medium: {medium}   Low: {low}", ln=True)
-    pdf.ln(10)
+            check = safe_text(f.get("Check", ""))
+            resource = safe_text(f.get("Resource", ""))
+            issue = safe_text(f.get("Issue", ""))
+            line = f"[{severity}] {check} - {resource}: {issue}"
 
-    # Table Header
-    pdf.set_font("Helvetica", 'B', 11)
-    pdf.cell(50, 10, "Check", 1)
-    pdf.cell(50, 10, "Resource", 1)
-    pdf.cell(90, 10, "Issue", 1, ln=True)
+            pdf.multi_cell(0, 8, txt=safe_text(line))
+            pdf.ln(1)
 
-    # Table Rows
-    pdf.set_font("Helvetica", '', 10)
-    for r in scan_results:
-        pdf.cell(50, 10, r['Check'][:30], 1)
-        pdf.cell(50, 10, r['Resource'][:30], 1)
-        pdf.cell(90, 10, r['Issue'][:40], 1, ln=True)
+    # Footer
+    pdf.set_text_color(120, 120, 120)
+    pdf.set_y(-15)
+    pdf.set_font("Arial", size=8)
+    pdf.cell(0, 10, txt=safe_text(f"StackAudit v1.0 – Generated on {timestamp}"), ln=True, align="C")
 
     pdf.output(filename)
     print(f"📄 PDF report generated: {filename}")
