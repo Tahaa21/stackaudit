@@ -1,0 +1,12 @@
+README.md
+setup.py
+stackaudit/__init__.py
+stackaudit/cli.py
+stackaudit/report_generator.py
+stackaudit/scanner.py
+stackaudit.egg-info/PKG-INFO
+stackaudit.egg-info/SOURCES.txt
+stackaudit.egg-info/dependency_links.txt
+stackaudit.egg-info/entry_points.txt
+stackaudit.egg-info/requires.txt
+stackaudit.egg-info/top_level.txt

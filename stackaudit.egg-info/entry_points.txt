@@ -1,0 +1,3 @@
+[console_scripts]
+stackaudit = stackaudit.cli:main
+
